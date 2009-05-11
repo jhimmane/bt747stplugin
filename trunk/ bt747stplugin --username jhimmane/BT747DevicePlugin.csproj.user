@@ -1,0 +1,5 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ReferencePath>C:\Program Files\Zone Five Software\SportTracks 2.1\</ReferencePath>
+  </PropertyGroup>
+</Project>
