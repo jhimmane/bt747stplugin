@@ -12,6 +12,11 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
 {
     class BT747Device
     {
+        public BT747Device(DeviceConfigurationInfo configInfo)
+        {
+            this.configInfo = configInfo;
+        }
+        
         public void Open(int portNumber)
         {
             port = OpenPort(portNumber);
@@ -123,9 +128,12 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             if (NMEAresponce[9] == '3')
             {
                 //System.Diagnostics.Debug.WriteLine("BT747,ParseLogSize: " + NMEAresponce.Substring(13, 8));
+                WriteDebuglog("ParseLogSize - NMEAresponce: " + NMEAresponce, configInfo.debug);
+                WriteDebuglog("ParseLogSize - NMEAresponce[9]: " + NMEAresponce[9], configInfo.debug);
+                WriteDebuglog("ParseLogSize - NMEAresponce.Substring(13, 8): " + NMEAresponce.Substring(13, 8), configInfo.debug);
                 return NMEAresponce.Substring(13, 8);
             }
-            else return null;
+            else return "";
         }
 
         /**
@@ -135,16 +143,15 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
 
         public IList<BT747Packet.TrackFileSection> ReadNMEATracks(IJobMonitor monitor, int trackChange, bool onlyNew)
         {
+            
             monitor.StatusText = String.Format(CommonResources.Text.Devices.ImportJob_Status_Reading, 0 + "%");          
 
             IList<BT747Packet.TrackFileSection> sectionList = new List<BT747Packet.TrackFileSection>();
             BT747Packet.TrackFileSection trackSection = new BT747Packet.TrackFileSection();
             float percentComplete = 0.0F;
-            //sectionList.Add(trackSection);
-
-            //Disable logging to prevent unwanted recordings during the import
-            string NMEAString = "$PMTK182,5*";
             
+            //Disable logging to prevent unwanted recordings during the import
+            string NMEAString = "$PMTK182,5*";            
             string ResponceString = SendNMEA(NMEAString);
             
             //Read log size
@@ -152,16 +159,15 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                 + BT747Constants.PMTK_CMD_LOG_STR + ","
                 + BT747Constants.PMTK_LOG_QUERY_STR + ","
                 + BT747Constants.PMTK_LOG_MEM_USED_STR
-                + "*";
-            
+                + "*";            
             ResponceString = SendNMEA(NMEAString);
          
             string logstring = "";            
             string previous_logstring = "";            
             string logSize = ParseLogSize(ResponceString);
-            
+            WriteDebuglog("ReadNMEATracks - logSize: " + logSize, configInfo.debug);
 
-            if (logSize != null)
+            if (logSize != "")
             {
                 //Acknowledge
                 NMEAString = "$PMTK"
@@ -172,7 +178,10 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                 ResponceString = SendNMEA(NMEAString);
             }
             else
+            {
+                WriteDebuglog("ReadNMEATracks - Reading log size failed", configInfo.debug);
                 return null;
+            }
 
             /* 
              * PMTK_LOG_REQ_DATA
@@ -181,7 +190,9 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
              * SIZE:Number of bytes to return (hex)
              */
             
-            string lastPosition = Plugin.Instance.BT747LastPosition; //Address of last read data            
+            string lastPosition = Plugin.Instance.BT747LastPosition; //Address of last read data  
+            WriteDebuglog("ReadNMEATracks - lastPosition: " + lastPosition, configInfo.debug);
+
             string readPosition = "00000000";   // First address to return           
             string readSize = logSize;          // Amount of data to be read
          
@@ -213,7 +224,7 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                     else
                     {
                         //TODO: Add check for log data versus data read last time
-
+                                               
                         readPosition = position.ToString("X8");
                         readSize = bytesToRead.ToString("X8");
 
@@ -232,6 +243,12 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                 readPosition = "00000000";
                 readSize = logSize;
                 bytesToRead = int.Parse(logSize, System.Globalization.NumberStyles.HexNumber);
+                if (bytesToRead < 2 * 0x200)
+                {
+                    //Not enough data, propaly no new tracks on the unit
+                    return sectionList;
+                }
+
             }
             // Read log contents, first chunk
             NMEAString = "$PMTK"
@@ -260,32 +277,35 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             while (ResponceString.StartsWith("$PMTK001,182,7,3*20") == false) {                          
                
                 ResponceString = SendNMEA(NMEAString);
-                if (ResponceString.StartsWith("$PMTK182,8"))
+                if (ResponceString.StartsWith("$PMTK182,8")) 
                 {                                        
                     logstring = logstring + ResponceString.Substring(20, ResponceString.LastIndexOf('*')-20); //Used to collect 20 responces into one logchunk which can be parsed
-                    i = i + 1;
+                    i = i + 1;                    
                     currentPosition+=0x800;
-                    percentComplete = 100 * currentPosition / bytesToRead;// int.Parse(logSize, System.Globalization.NumberStyles.HexNumber);
-
+                    percentComplete = 100 * currentPosition / bytesToRead;    // int.Parse(logSize, System.Globalization.NumberStyles.HexNumber);
                     monitor.StatusText = String.Format(CommonResources.Text.Devices.ImportJob_Status_Reading, percentComplete.ToString("0") + "%");
                     monitor.PercentComplete = percentComplete / 100;                    
                 }               
                 //System.Diagnostics.Debug.WriteLine("BT747,ReadNMEATracks - Responce2: " + ResponceString);
 
-                if (i == 0x20 || ResponceString.StartsWith("$PMTK001,182,7,3*20")) //chunk full || end of log
+                if (i >= 0x20 || ResponceString.StartsWith("$PMTK001,182,7,3*20")) //chunk full || end of log
                 {
-                    //Read the block header
-                    //System.Diagnostics.Debug.WriteLine("BT747,ReadNMEATracks - logstring: " + logstring);
-                    LogBlockHeader logHeader = new LogBlockHeader(logstring.Substring(0, 40));
-                    
-                    //System.Diagnostics.Debug.WriteLine("BT747,ReadNMEATracks - currentPosition: " + currentPosition + ", logSize: " + int.Parse(logSize, System.Globalization.NumberStyles.HexNumber));
-                    
-                    ParseNMEALog(ref sectionList, ref trackSection, logstring, ref previous_logstring, logHeader, trackChange);
 
-                    //System.Diagnostics.Debug.WriteLine("BT747,ReadNMEATracks - logstring length: " + logstring.Length + ", currentindex: " + i);
-                    
-                    logstring = "";
-                    i = 0;
+                    if (logstring.Length > 2 * 0x200)
+                    {
+                        //Read the block header
+                        //System.Diagnostics.Debug.WriteLine("BT747,ReadNMEATracks - logstring: " + logstring);
+                        LogBlockHeader logHeader = new LogBlockHeader(logstring.Substring(0, 40));
+
+                        //System.Diagnostics.Debug.WriteLine("BT747,ReadNMEATracks - currentPosition: " + currentPosition + ", logSize: " + int.Parse(logSize, System.Globalization.NumberStyles.HexNumber));
+
+                        ParseNMEALog(ref sectionList, ref trackSection, logstring, ref previous_logstring, logHeader, trackChange);
+
+                        //System.Diagnostics.Debug.WriteLine("BT747,ReadNMEATracks - logstring length: " + logstring.Length + ", currentindex: " + i);
+
+                        logstring = "";
+                        i = 0;
+                    }
                 }               
             }
             sectionList.Add(trackSection);
@@ -295,7 +315,6 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
 
             //System.Diagnostics.Debug.WriteLine("ReadNMEATracks - end: " + sectionList.Count, "BT747");
             return sectionList;
-
         }
 
         /**
@@ -303,21 +322,22 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
          * block. Tracks are stored into list of trackfilesections.
          * 
          */
-        private static void ParseNMEALog(ref IList<BT747Packet.TrackFileSection> sectionList, ref BT747Packet.TrackFileSection trackSection, string logstring, ref string previous_logstring, LogBlockHeader logHeader, int trackChange)
+        private void ParseNMEALog(ref IList<BT747Packet.TrackFileSection> sectionList, ref BT747Packet.TrackFileSection trackSection, string logstring, ref string previous_logstring, LogBlockHeader logHeader, int trackChange)
         {
             //System.Diagnostics.Debug.WriteLine("BT747,ParseNMEALog - logstring: " + logstring);
             //System.Diagnostics.Debug.WriteLine("BT747,ParseNMEALog - logstring length: " + logstring.Length);
+            
+            WriteDebuglog("ParseNMEALog - logstring length: " + logstring.Length, configInfo.debug);
+
             //Remove the header string
             logstring = previous_logstring + logstring.Substring(2 * 0x200);
 
-            int currentIndex = 0; //2 * 0x200; //2 chars per byte
-            //System.Diagnostics.Debug.WriteLine("BT747,ParseNMEALog - 1: " + logstring.Substring(currentIndex, 14));
+            int currentIndex = 0; //2 * 0x200; //2 chars per byte            
             bool end_of_chunk = false; //True if the current trackpoint is the first of the track
 
             while (logHeader.format.getMaxPacketSize() + currentIndex < logstring.Length && end_of_chunk == false)
             {
-
-                end_of_chunk = BT747Packet.UnpackNMEATrackSection(logHeader, ref logstring, ref trackSection, trackChange);
+                end_of_chunk = BT747Packet.UnpackNMEATrackSection(logHeader, ref logstring, ref trackSection, trackChange, configInfo.debug);
                 if (!end_of_chunk){
                     sectionList.Add(trackSection);
                     trackSection = null;
@@ -328,7 +348,6 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             
             previous_logstring = logstring;      
             logstring ="";
-
         }
         
         private static SerialPort OpenPort(int portNumber)
@@ -338,6 +357,8 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             {
                 port = new SerialPort("COM" + portNumber, 115200);
                 port.ReadTimeout = port.WriteTimeout = 5000;
+                //port.DtrEnable = true;
+                //port.Handshake = Handshake.None;
                 port.Open();
 
                 if (port.IsOpen)
@@ -364,37 +385,39 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
          * 
          */
 
-        private static string SendNMEA(string NMEAString)
+        private string SendNMEA(string NMEAString)
         {
             string received = "a";
             int i=0;
-
             string checksum = GetChecksum(NMEAString);
             NMEAString = NMEAString + checksum + "\r\n";
              
             System.Diagnostics.Debug.WriteLine("BT747,sendNMEA: "+ port.PortName + "," + NMEAString);
 
-
             if (port.IsOpen == false)
             {
                 port.Open();
             }
-
+            
+            WriteDebuglog("sendNMEA - Out: " + NMEAString, configInfo.debug);
             port.Write(NMEAString);
                         
             while (received.StartsWith("$PMTK") == false)
-            {
+            {               
                 received = port.ReadLine();
-
-                if (i == 10) {
+                WriteDebuglog("sendNMEA - Responce: " + received, configInfo.debug);
+                
+                //Filter the incoming messages to minimize starting problems in the communication
+                if (i == 50) {  
                     //System.Diagnostics.Debug.WriteLine("BT747,sendNMEA: "+ port.PortName + "," + NMEAString);
                     port.Write(NMEAString);
                     i=0;
                 }
                 i++;
             }
-           // if (received.StartsWith("$PMTK") == false)
-                System.Diagnostics.Debug.WriteLine("BT747,sendNMEA - Responce: "+received);
+            // if (received.StartsWith("$PMTK") == false)
+            //System.Diagnostics.Debug.WriteLine("BT747,sendNMEA - Responce: "+received);
+            //WriteDebuglog("sendNMEA - Responce: " + received, configInfo.debug);
             
             return received;
         }
@@ -416,6 +439,17 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             }
             received.Checksum = (byte)port.ReadByte();
             return received;
+        }
+        public static void WriteDebuglog(string text,bool debug)
+        {
+            if (debug) 
+            {
+                System.Diagnostics.Debug.WriteLine("WriteDebuglog: " + text, "BT747");
+                   
+                System.IO.StreamWriter file = new System.IO.StreamWriter(@"BT747Debug.log", true);
+                file.WriteLine(System.DateTime.Now.ToString("g")+": "+text);
+                file.Close();
+            }  
         }
 
      /*   private void SavePosition(string logSize)
@@ -453,6 +487,13 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
         }
         */
         public static SerialPort port;
+        private DeviceConfigurationInfo settings;
+       /* {
+            set { settings = value; }
+            get {return settings;}
+        }*/
         private int portNumber;
+        private DeviceConfigurationInfo configInfo;
+        
     }
 }
