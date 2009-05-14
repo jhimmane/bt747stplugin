@@ -16,18 +16,18 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             public Int16 MaximumSpeed;
             public byte MaximumHeartRate;
             public byte AverageHeartRate;
-            public Int16 TrackPointCount;
+            public Int32 TrackPointCount;
         }
 
         public class TrackFileHeader : Header
         {
-            public Int16 TrackPointIndex;
+            public Int32 TrackPointIndex;
         }
 
         public class TrackFileSection : Header
         {
-            public Int16 StartPointIndex;
-            public Int16 EndPointIndex;
+            public Int32 StartPointIndex;
+            public Int32 EndPointIndex;
             public IList<TrackPoint> TrackPoints = new List<TrackPoint>();
         }
 
@@ -84,11 +84,13 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             return headers;
         }
 
-        public static bool UnpackNMEATrackSection(LogBlockHeader logHeader, ref string logstring, ref TrackFileSection trackSection, int trackChange)
+        public static bool UnpackNMEATrackSection(LogBlockHeader logHeader, ref string logstring, ref TrackFileSection trackSection, int trackChange, bool debug)
         {
             //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - logstring:" + logstring);
             //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - logstring length:" + logstring.Length);
-                        
+
+            BT747Device.WriteDebuglog("UnpackNMEATrackSection - logstring length: " + logstring.Length, debug);
+
             int currentIndex=0, previousindex = 0, nsat = 0;
             bool firstPoint = true, valid = true;
 
@@ -126,7 +128,9 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                         //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - currentIndex: " + currentIndex);
                         //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - substring: " + logstring.Substring(currentIndex, 8));
                         //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - reverse: " + LogBlockHeader.ReverseBytes(logstring.Substring(currentIndex, 8)));
-                        
+                        BT747Device.WriteDebuglog("UnpackNMEATrackSection - currentIndex: " + currentIndex, debug);
+                        BT747Device.WriteDebuglog("UnpackNMEATrackSection - date substring: " + logstring.Substring(currentIndex, 8), debug); 
+  
                         if (firstPoint)
                         {
                             trackSection.StartTime = System.DateTime.Parse("1/1/1970");
@@ -137,10 +141,6 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                             //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - StartTimeUtc: " + trackSection.StartTimeUtc);
 
                             trackSection.StartTime = trackSection.StartTime.AddSeconds(trackSection.StartTimeUtc);
-                            
-                            //TODO: REMOVE!!!!!!!!!!!!!!!!
-                            //trackSection.StartTime = trackSection.StartTime.AddSeconds(60 * 60 * 24);
-                            
                             //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - StartTime2: " + trackSection.StartTime);                            
 
                             trackpoint.PointTime = trackSection.StartTime;
@@ -148,19 +148,11 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                         else
                         {
                             long pointTime = long.Parse(LogBlockHeader.ReverseBytes(logstring.Substring(currentIndex, 8)), System.Globalization.NumberStyles.HexNumber);
-                            
                             trackpoint.PointTime = System.DateTime.Parse("1/1/1970");
-
                             trackpoint.PointTime = trackpoint.PointTime.AddSeconds(pointTime);
-
-                            //TODO: REMOVE!!!!!!!!!!!!!!!!
-                            //trackpoint.PointTime = trackpoint.PointTime.AddSeconds(60*60*24);
-
                             //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - PointTime: " + trackpoint.PointTime);
-                            
                         }
                             
-                        //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - StartTime3: " + trackSection.StartTime);
                         //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - PointTime: " + trackpoint.PointTime);
                         
                         currentIndex += 2 * 4;
@@ -175,6 +167,8 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                     if (logHeader.getFormat().hasLatitude())
                     {
                         //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - latitude: " + logstring.Substring(currentIndex, 16));
+                        BT747Device.WriteDebuglog("UnpackNMEATrackSection - latitude: " + logstring.Substring(currentIndex, 16), debug);
+
                         long num = long.Parse(LogBlockHeader.ReverseBytes(logstring.Substring(currentIndex, 16)), System.Globalization.NumberStyles.HexNumber);
                         byte[] floatVals = BitConverter.GetBytes(num);
                         trackpoint.Latitude = BitConverter.ToDouble(floatVals, 0);
@@ -186,6 +180,8 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                     if (logHeader.getFormat().hasLongitude())
                     {
                         //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - longitude: " + logstring.Substring(currentIndex, 16));
+                        BT747Device.WriteDebuglog("UnpackNMEATrackSection - longitude: " + logstring.Substring(currentIndex, 16), debug);
+
                         long num = long.Parse(LogBlockHeader.ReverseBytes(logstring.Substring(currentIndex, 16)), System.Globalization.NumberStyles.HexNumber);
                         byte[] floatVals = BitConverter.GetBytes(num);
                         trackpoint.Longitude = BitConverter.ToDouble(floatVals, 0);
@@ -196,6 +192,7 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                     if (logHeader.getFormat().hasHeight())
                     {
                         //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - height: " + logstring.Substring(currentIndex, 8));
+                        BT747Device.WriteDebuglog("UnpackNMEATrackSection - height: " + logstring.Substring(currentIndex, 8), debug);
 
                         uint num = uint.Parse(LogBlockHeader.ReverseBytes(logstring.Substring(currentIndex, 8)), System.Globalization.NumberStyles.HexNumber);
                         byte[] floatVals = BitConverter.GetBytes(num);
@@ -209,7 +206,8 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                     {
                         //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - speed: " + logstring.Substring(currentIndex, 8));
                         //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - speed: " + speed);
-                        
+                        BT747Device.WriteDebuglog("UnpackNMEATrackSection - speed: " + logstring.Substring(currentIndex, 8), debug);
+
                         //TODO: This should be in km/h according to documentation. What is correct format for sporttracks?                           
                         uint num = uint.Parse(LogBlockHeader.ReverseBytes(logstring.Substring(currentIndex, 8)), System.Globalization.NumberStyles.HexNumber);
                         byte[] floatVals = BitConverter.GetBytes(num);
@@ -256,7 +254,7 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                     if (logHeader.getFormat().hasNSat())
                     {
                         //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - nsat: " + logstring.Substring(currentIndex, 4));
-                        nsat = int.Parse(LogBlockHeader.ReverseBytes(logstring.Substring(currentIndex, 2)), System.Globalization.NumberStyles.HexNumber);
+                        //nsat = int.Parse(LogBlockHeader.ReverseBytes(logstring.Substring(currentIndex, 2)), System.Globalization.NumberStyles.HexNumber);
                         currentIndex += 2 * 2;
                     }
                     if (logHeader.getFormat().hasSID())
@@ -292,23 +290,16 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                     }
                     if (logHeader.getFormat().hasDist())
                     {
-                        //if (trackpoint.Speed > 0)
-                        //{
-                            //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - distance: " + logstring.Substring(currentIndex, 16));
+                        
+                        //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - distance: " + logstring.Substring(currentIndex, 16));
+                        BT747Device.WriteDebuglog("UnpackNMEATrackSection - distance: " + logstring.Substring(currentIndex, 16), debug);
 
-                            long num = long.Parse(LogBlockHeader.ReverseBytes(logstring.Substring(currentIndex, 16)), System.Globalization.NumberStyles.HexNumber);
-                            byte[] floatVals = BitConverter.GetBytes(num);
-                            //system.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - floatVals: " + floatVals[0);
-                            double meters = BitConverter.ToDouble(floatVals, 0);
-                            //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - distance2: " + meters);
-                            
-                            //if (meters > 10) meters = 0;
-                            
-                            trackSection.TotalDistanceMeters += meters;
-                            //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - distance3: " + trackSection.TotalDistanceMeters);
-
-                        //}
-                        //trackSection.TotalDistanceMeters += long.Parse(LogBlockHeader.ReverseBytes(logstring.Substring(currentIndex, 16)), System.Globalization.NumberStyles.HexNumber);
+                        long num = long.Parse(LogBlockHeader.ReverseBytes(logstring.Substring(currentIndex, 16)), System.Globalization.NumberStyles.HexNumber);
+                        byte[] floatVals = BitConverter.GetBytes(num);
+                        //system.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - floatVals: " + floatVals[0);
+                        double meters = BitConverter.ToDouble(floatVals, 0);
+                        trackSection.TotalDistanceMeters += meters;
+                        
                         currentIndex += 2 * 8;
                     }
                     /*if (logHeader.getFormat().isLowPrecision())
@@ -326,6 +317,8 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                         {
                             //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - add: " + trackpoint.PointTime + " - " + trackSection.TrackPoints[trackSection.TrackPointCount-1].PointTime);
                             //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - add: " + trackSection.TrackPointCount);
+                            BT747Device.WriteDebuglog("UnpackNMEATrackSection - add: " + trackSection.TrackPointCount, debug);
+
                             //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - add: " + trackpoint.PointTime.Ticks + " - " + trackSection.TrackPoints[trackSection.TrackPointCount-1].PointTime.Ticks);
                             //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - add: " + (trackpoint.PointTime.Ticks - trackSection.TrackPoints[trackSection.TrackPointCount-1].PointTime.Ticks));
                             trackSection.TrackPoints.Add(trackpoint);

@@ -22,7 +22,7 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
 
         public bool Import()
         {
-            BT747Device device = new BT747Device();
+            BT747Device device = new BT747Device(configInfo);
             try
             {
                 monitor.StatusText = CommonResources.Text.Devices.ImportJob_Status_OpeningDevice;

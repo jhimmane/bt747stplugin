@@ -41,13 +41,15 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             {
                 DeviceConfigurationInfo configInfo = DeviceConfigurationInfo.Parse(null);
                 configInfo.ImportOnlyNew = chkImportOnlyNew.Checked;
+                configInfo.debug = debugBox.Checked;
                 configInfo.portNumber = int.Parse(txtCOMPort.Text);
                 configInfo.trackChange = int.Parse(txtTrackChange.Text);
                 return configInfo;
             }
             set
             {
-                chkImportOnlyNew.Checked = value.ImportOnlyNew;               
+                chkImportOnlyNew.Checked = value.ImportOnlyNew;
+                debugBox.Checked = value.debug;
                 txtCOMPort.Text = value.portNumber.ToString();
                 txtTrackChange.Text = value.trackChange.ToString();
             }
@@ -102,7 +104,7 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
         }
         void btnClearLog_Click(object sender, EventArgs e)
         {   
-            BT747Device device = new BT747Device();
+            BT747Device device = new BT747Device(ConfigurationInfo);
             DialogResult dr = new DialogResult();
 
             dr = MessageDialog.Show("Clear log, are you sure?", "Clearing log", MessageBoxButtons.OKCancel);
