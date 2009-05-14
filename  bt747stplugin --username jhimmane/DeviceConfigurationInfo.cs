@@ -27,12 +27,11 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                             case "newonly":
                                 configInfo.ImportOnlyNew = parts[1] == "1";                               
                                 break;
-                          /*  case "lastposition":
-                                if (configInfo.ImportOnlyNew)
-                                    configInfo.lastPosition = parts[1]; 
-                                else
-                                    configInfo.lastPosition = "00000000";
-                                break;*/
+
+                            case "debug":
+                                configInfo.debug = parts[1] == "1";
+                                break;
+                            
                             case "port":
                                 
                                 /*if (parts[1].StartsWith("COM"))
@@ -57,12 +56,13 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
         public override string ToString()
         {
             return "newonly=" + (ImportOnlyNew ? "1" : "0") +
-                  // ";lastposition=" + lastPosition.ToString() +
+                   ";debug=" + (debug ? "1" : "0") +
                    ";port=" + portNumber.ToString() +
                    ";trackchange=" + trackChange.ToString();
         }
 
         public bool ImportOnlyNew = true;
+        public bool debug = false;
 //        public String lastPosition = "00000000";
         public int portNumber = 6;
         public int trackChange = 1;

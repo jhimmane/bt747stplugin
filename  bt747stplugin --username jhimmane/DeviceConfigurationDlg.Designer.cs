@@ -37,6 +37,7 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             this.trackLabel = new System.Windows.Forms.Label();
             this.btnClearLog = new System.Windows.Forms.Button();
             this.waitLabel = new System.Windows.Forms.Label();
+            this.debugBox = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // btnOk
@@ -80,7 +81,6 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             this.btnCancel.TextAlign = System.Drawing.StringAlignment.Center;
             this.btnCancel.TextLeftMargin = 2;
             this.btnCancel.TextRightMargin = 2;
-            this.btnCancel.UseWaitCursor = false;
             // 
             // chkImportOnlyNew
             // 
@@ -93,7 +93,6 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             this.chkImportOnlyNew.TabIndex = 0;
             this.chkImportOnlyNew.Text = "Import new data only";
             this.chkImportOnlyNew.UseVisualStyleBackColor = true;
-            this.chkImportOnlyNew.UseWaitCursor = false;
             // 
             // txtCOMPort
             // 
@@ -113,7 +112,6 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             this.txtCOMPort.Size = new System.Drawing.Size(58, 19);
             this.txtCOMPort.TabIndex = 1;
             this.txtCOMPort.TextAlign = System.Windows.Forms.HorizontalAlignment.Left;
-            this.txtCOMPort.UseWaitCursor = false;
             // 
             // labelCOMPort
             // 
@@ -122,7 +120,6 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             this.labelCOMPort.Size = new System.Drawing.Size(100, 19);
             this.labelCOMPort.TabIndex = 1;
             this.labelCOMPort.Text = "COM Port:";
-            this.labelCOMPort.UseWaitCursor = false;
             // 
             // txtTrackChange
             // 
@@ -142,7 +139,6 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             this.txtTrackChange.Size = new System.Drawing.Size(58, 19);
             this.txtTrackChange.TabIndex = 2;
             this.txtTrackChange.TextAlign = System.Windows.Forms.HorizontalAlignment.Left;
-            this.txtTrackChange.UseWaitCursor = false;
             // 
             // trackLabel
             // 
@@ -151,7 +147,6 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             this.trackLabel.Size = new System.Drawing.Size(112, 19);
             this.trackLabel.TabIndex = 6;
             this.trackLabel.Text = "Track change (min):";
-            this.trackLabel.UseWaitCursor = false;
             // 
             // btnClearLog
             // 
@@ -161,7 +156,6 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             this.btnClearLog.TabIndex = 3;
             this.btnClearLog.Text = "Clear Log";
             this.btnClearLog.UseVisualStyleBackColor = true;
-            this.btnClearLog.UseWaitCursor = false;
             this.btnClearLog.Click += new System.EventHandler(this.btnClearLog_Click);
             // 
             // waitLabel
@@ -174,11 +168,22 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             this.waitLabel.Text = "Clearing log, please wait...";
             this.waitLabel.Visible = false;
             // 
+            // debugBox
+            // 
+            this.debugBox.AutoSize = true;
+            this.debugBox.Location = new System.Drawing.Point(146, 12);
+            this.debugBox.Name = "debugBox";
+            this.debugBox.Size = new System.Drawing.Size(87, 17);
+            this.debugBox.TabIndex = 8;
+            this.debugBox.Text = "Debug mode";
+            this.debugBox.UseVisualStyleBackColor = true;
+            // 
             // DeviceConfigurationDlg
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(280, 175);
+            this.Controls.Add(this.debugBox);
             this.Controls.Add(this.waitLabel);
             this.Controls.Add(this.btnClearLog);
             this.Controls.Add(this.trackLabel);
@@ -211,5 +216,6 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
         private System.Windows.Forms.Label trackLabel;
         private System.Windows.Forms.Button btnClearLog;
         private System.Windows.Forms.Label waitLabel;
+        private System.Windows.Forms.CheckBox debugBox;
     }
 }

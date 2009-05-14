@@ -30,8 +30,8 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
         {
             get { return "SportTracks BT747 Device Plugin"; }
         }
-        
-        public string BT747LastPosition;
+
+        public string BT747LastPosition = "00000000";
 
 
         public string Version
@@ -50,6 +50,7 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
         }
 
         #endregion
+
 
         public static Plugin Instance
         {
