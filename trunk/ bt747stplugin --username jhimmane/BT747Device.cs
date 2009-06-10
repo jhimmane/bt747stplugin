@@ -125,13 +125,14 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
         public string ParseLogSize(String NMEAresponce)
         {
             //$PMTK182,3,8,00171AF8*16
-            if (NMEAresponce[9] == '3')
-            {
-                //System.Diagnostics.Debug.WriteLine("BT747,ParseLogSize: " + NMEAresponce.Substring(13, 8));
-                WriteDebuglog("ParseLogSize - NMEAresponce: " + NMEAresponce, configInfo.debug);
-                WriteDebuglog("ParseLogSize - NMEAresponce[9]: " + NMEAresponce[9], configInfo.debug);
-                WriteDebuglog("ParseLogSize - NMEAresponce.Substring(13, 8): " + NMEAresponce.Substring(13, 8), configInfo.debug);
-                return NMEAresponce.Substring(13, 8);
+            if (NMEAresponce.Length >= 21 ){
+                if (NMEAresponce[9] == '3')
+                {
+                    //System.Diagnostics.Debug.WriteLine("BT747,ParseLogSize: " + NMEAresponce.Substring(13, 8));
+                    WriteDebuglog("ParseLogSize - NMEAresponce: " + NMEAresponce, configInfo.debug);
+                    return NMEAresponce.Substring(13, 8);
+                }
+                else return "";
             }
             else return "";
         }
@@ -170,12 +171,12 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             if (logSize != "")
             {
                 //Acknowledge
-                NMEAString = "$PMTK"
+               /* NMEAString = "$PMTK"
                 + BT747Constants.PMTK_ACK_STR + ","
                 + BT747Constants.PMTK_LOG_QUERY_STR + ","
                 + BT747Constants.PMTK_LOG_MEM_USED_STR
                 + ",3*";
-                ResponceString = SendNMEA(NMEAString);
+                ResponceString = SendNMEA(NMEAString);*/
             }
             else
             {
@@ -191,16 +192,20 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
              */
             
             string lastPosition = Plugin.Instance.BT747LastPosition; //Address of last read data  
+            if (lastPosition.Length != 8)
+            {
+                lastPosition = "00000000";
+            }
+
             WriteDebuglog("ReadNMEATracks - lastPosition: " + lastPosition, configInfo.debug);
 
             string readPosition = "00000000";   // First address to return           
             string readSize = logSize;          // Amount of data to be read
-         
+            int bytesToRead = 0;         
+
             // Get the start address of the first 0x10000 byte chunk to be read 
             int position = int.Parse(lastPosition, System.Globalization.NumberStyles.HexNumber) / 0x10000;
-            position *= 0x10000;            
-            
-            int bytesToRead = 0;
+            position *= 0x10000;  
 
             if (onlyNew)
             {
@@ -257,34 +262,44 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                 + readPosition + ","
                 + readSize + "*";
             
-            ResponceString = SendNMEA(NMEAString);
+           // ResponceString = SendNMEA(NMEAString);
+            ResponceString = readLog(NMEAString);
 
             int i = 0;
-            if (ResponceString.StartsWith("$PMTK182,8,")){
+            if (NMEAString.Length >= 21)
+            {
+                if (ResponceString.StartsWith("$PMTK182,8,"))
+                {
 
-                logstring = ResponceString.Substring(20, ResponceString.LastIndexOf('*') - 20); //Used to collect 20 responces into one logchunk which can be parsed
-                i = 1;
+                    logstring = ResponceString.Substring(20, ResponceString.LastIndexOf('*') - 20); //Used to collect 20 responces into one logchunk which can be parsed
+                    i = 1;
+                }
             }
             
             //Send ack
-            NMEAString = "$PMTK"
+           /*NMEAString = "$PMTK"
                 + BT747Constants.PMTK_ACK_STR + ","
                 + BT747Constants.PMTK_LOG_RESP_DATA_STR                
                 + ",3*";
-
+            */
             int currentPosition = 0;//int.Parse(ResponceString.Substring(11, 8), System.Globalization.NumberStyles.HexNumber);
 
-            while (ResponceString.StartsWith("$PMTK001,182,7,3*20") == false) {                          
-               
-                ResponceString = SendNMEA(NMEAString);
+            while (ResponceString.StartsWith("$PMTK001,182,7,3*20") == false) {
+
+                // ResponceString = SendNMEA(NMEAString);
+                ResponceString = readLog(" "/*NMEAString*/);
+
                 if (ResponceString.StartsWith("$PMTK182,8")) 
-                {                                        
-                    logstring = logstring + ResponceString.Substring(20, ResponceString.LastIndexOf('*')-20); //Used to collect 20 responces into one logchunk which can be parsed
-                    i = i + 1;                    
-                    currentPosition+=0x800;
-                    percentComplete = 100 * currentPosition / bytesToRead;    // int.Parse(logSize, System.Globalization.NumberStyles.HexNumber);
-                    monitor.StatusText = String.Format(CommonResources.Text.Devices.ImportJob_Status_Reading, percentComplete.ToString("0") + "%");
-                    monitor.PercentComplete = percentComplete / 100;                    
+                {
+                    if (ResponceString.Length >= 20)
+                    {
+                        logstring = logstring + ResponceString.Substring(20, ResponceString.LastIndexOf('*') - 20); //Used to collect 20 responces into one logchunk which can be parsed
+                        i = i + 1;
+                        currentPosition += 0x800;
+                        percentComplete = 100 * currentPosition / bytesToRead;    // int.Parse(logSize, System.Globalization.NumberStyles.HexNumber);
+                        monitor.StatusText = String.Format(CommonResources.Text.Devices.ImportJob_Status_Reading, percentComplete.ToString("0") + "%");
+                        monitor.PercentComplete = percentComplete / 100;
+                    }
                 }               
                 //System.Diagnostics.Debug.WriteLine("BT747,ReadNMEATracks - Responce2: " + ResponceString);
 
@@ -379,6 +394,80 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             throw new Exception(CommonResources.Text.Devices.ImportJob_Status_CouldNotOpenDeviceError);
         }
 
+
+
+
+
+        /**
+         * 
+         * This function reads the log contents from BT747 device
+         * 
+         */
+
+        private string readLog(string NMEAString)
+        {
+            //string received = "";
+            //int i = 0;
+            string checksum = GetChecksum(NMEAString);
+            NMEAString = NMEAString + checksum + "\r\n";
+
+            
+            if (port.IsOpen == false)
+            {
+                port.Open();
+            }
+
+            if (NMEAString.StartsWith("$PMTK"))
+            {
+                System.Diagnostics.Debug.WriteLine("BT747,readLog- Out: " + port.PortName + "," + NMEAString);
+                WriteDebuglog("readLog - Out: " + NMEAString, configInfo.debug);
+                port.Write(NMEAString);
+            }
+                        
+            StringBuilder result = new StringBuilder("");
+            bool eol = false;
+            bool startfound = false;
+            while (eol == false)
+            {
+                try
+                {
+                    int input = ' ';
+                    
+                    input = port.ReadChar();
+
+                    // Remove extra characters
+
+                    if (startfound)
+                    {
+                        if (input != '\r' && input != '\n')
+                        {
+                            result.Append((char)input);
+                        }
+                        else 
+                            eol = true;
+                            
+                    }
+                    else if (input == '$')
+                    {
+                        startfound = true;
+                        result.Append((char)input);
+                    }
+
+                    //System.Diagnostics.Debug.WriteLine("BT747,sendNMEA: input: " + input);
+                    
+                }
+                catch
+                {
+                }
+            }
+            System.Diagnostics.Debug.WriteLine("BT747,readLog: result: " + result);
+            // if (received.StartsWith("$PMTK") == false)
+            //System.Diagnostics.Debug.WriteLine("BT747,sendNMEA - Responce: "+received);
+            WriteDebuglog("readLog - result: " + result.ToString(), configInfo.debug);
+
+            return result.ToString();
+        }
+
         /**
          * 
          * This function sends a NMEA string to the selected COM port and returns the responce string to caller
@@ -401,10 +490,10 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             
             WriteDebuglog("sendNMEA - Out: " + NMEAString, configInfo.debug);
             port.Write(NMEAString);
-                        
+           
             while (received.StartsWith("$PMTK") == false)
-            {               
-                received = port.ReadLine();
+            {
+                received = port.ReadTo("\n");
                 WriteDebuglog("sendNMEA - Responce: " + received, configInfo.debug);
                 
                 //Filter the incoming messages to minimize starting problems in the communication
@@ -445,9 +534,10 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             if (debug) 
             {
                 System.Diagnostics.Debug.WriteLine("WriteDebuglog: " + text, "BT747");
-                   
-                System.IO.StreamWriter file = new System.IO.StreamWriter(@"BT747Debug.log", true);
-                file.WriteLine(System.DateTime.Now.ToString("g")+": "+text);
+                //System.Diagnostics.Debug.WriteLine("WriteDebuglog: " + System.Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\BT747Debug.log", "BT747");
+
+                System.IO.StreamWriter file = new System.IO.StreamWriter(@System.Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\BT747Debug.log", true);
+                file.WriteLine(System.DateTime.Now.ToString("dd.MM.yy hh:mm:ss.fff")+": "+text);
                 file.Close();
             }  
         }
