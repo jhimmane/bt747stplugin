@@ -92,30 +92,18 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             BT747Device.WriteDebuglog("UnpackNMEATrackSection - logstring length: " + logstring.Length, debug);
 
             int currentIndex=0, previousindex = 0, nsat = 0;
-            bool firstPoint = true, valid = true;
+            bool firstPoint = true, valid = true, lastPoint = false;
 
-            while (logHeader.format.getMaxPacketSize() + currentIndex < logstring.Length && 
-                  (logstring.Substring(currentIndex, 8).StartsWith("FFFFFFFF")) == false)
+            while (!lastPoint)
             {
                // System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - progress: " + currentIndex + "/" + logstring.Length +
                 //                                    " Maxpacket: "+logHeader.format.getMaxPacketSize()   );
                 previousindex = currentIndex;
                 //sep_record - not handled for now
-                if (logstring.Substring(currentIndex, 14) == "AAAAAAAAAAAAAA")
+                if (logstring.Substring(currentIndex).StartsWith("AAAAAAAAAAAAAA"))
                 {
-                    //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - sep_record");
-                    switch (int.Parse(logstring.Substring(currentIndex + 14, 2)))
-                    {
-                        case 2: break;  //0x02 - Log bitmask change [long bitmask]
-                        case 3: break;  //0x03 - Log period change [word period/10 sec]
-                        case 4: break;  //0x04 - Log distance change [word distance/10 m]
-                        case 5: break;  //0x05 - Log speed change [word speed/10 km/h]
-                        case 6: break;  //0x06 - Log overwrite/log stop change
-                                        //- argument = same as log status (PMTK182,2,7 response)
-                        case 7: break;  //0x07 - Log on/off change
-                                        // - argument = same as log status (P¨MTK182,2,7 response)*/
-                    }
-                    currentIndex += 2 * 16;  // Size of sep_record
+                    currentIndex = HandleSepRecord(currentIndex, logstring, debug);
+                    lastPoint = CheckEndOfChunk(logstring, currentIndex, logHeader.format.getMaxPacketSize(), debug);
                 }
                 //We are only interested on points with all the necessary data
                 else
@@ -315,31 +303,27 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
                         }
                         else if (trackpoint.PointTime.Ticks - trackSection.TrackPoints[trackSection.TrackPointCount - 1].PointTime.Ticks < trackChange * TimeSpan.TicksPerMinute)
                         {
-                            //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - add: " + trackpoint.PointTime + " - " + trackSection.TrackPoints[trackSection.TrackPointCount-1].PointTime);
-                            //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - add: " + trackSection.TrackPointCount);
                             BT747Device.WriteDebuglog("UnpackNMEATrackSection - add: " + trackSection.TrackPointCount, debug);
-
-                            //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - add: " + trackpoint.PointTime.Ticks + " - " + trackSection.TrackPoints[trackSection.TrackPointCount-1].PointTime.Ticks);
-                            //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - add: " + (trackpoint.PointTime.Ticks - trackSection.TrackPoints[trackSection.TrackPointCount-1].PointTime.Ticks));
                             trackSection.TrackPoints.Add(trackpoint);
                             trackSection.TrackPointCount += 1;
-
                         }
                         else if ((trackpoint.PointTime.Ticks - trackSection.TrackPoints[trackSection.TrackPointCount-1].PointTime.Ticks) > trackChange * TimeSpan.TicksPerMinute )
                         {
-                            //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - change track: " + trackChange);
                             //Change track                        
                             logstring = logstring.Substring(previousindex);
-                            //end_of_chunk = false;
-                            //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - change track: " + (trackpoint.PointTime.Ticks - trackSection.TrackPoints[trackSection.TrackPointCount-1].PointTime.Ticks));
                             return false;
                         }
                     }
                     valid = true;
-                    //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - checksum: " + logstring.Substring(currentIndex, 4));
-                    currentIndex += 2 * 2; // move over the "*checsum" (2A XX)
+                    currentIndex += 2 * 2; // move over the "*checksum" (2A XX)
+
+                    lastPoint = CheckEndOfChunk(logstring, currentIndex, logHeader.format.getMaxPacketSize(),debug);
+
                 }
             }
+
+            currentIndex = HandleSepRecord(currentIndex, logstring, debug);
+
             //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - currentIndex: " + currentIndex + ",previousindex: " + previousindex + ",length: " + logstring.Length);
             //The last point belongs to next track or is incomplete
 
@@ -353,6 +337,52 @@ namespace ZoneFiveSoftware.SportTracks.Device.BT747
             return true;
         }
 
+
+        private static int HandleSepRecord(int currentIndex, string logstring, bool debug)
+        {
+            //sep_record - skip for now
+            BT747Device.WriteDebuglog("BT747,HandleSepRecord - currentIndex: " + currentIndex, debug);
+            while (logstring.Substring(currentIndex).StartsWith("AAAAAAAAAAAAAA"))
+            {
+                //System.Diagnostics.Debug.WriteLine("BT747,UnpackNMEATrackSection - sep_record");
+                /* switch (int.Parse(logstring.Substring(currentIndex + 14, 2)))
+                 {
+                     case 2: break;  //0x02 - Log bitmask change [long bitmask]
+                     case 3: break;  //0x03 - Log period change [word period/10 sec]
+                     case 4: break;  //0x04 - Log distance change [word distance/10 m]
+                     case 5: break;  //0x05 - Log speed change [word speed/10 km/h]
+                     case 6: break;  //0x06 - Log overwrite/log stop change
+                                     //- argument = same as log status (PMTK182,2,7 response)
+                     case 7: break;  //0x07 - Log on/off change
+                                     // - argument = same as log status (P¨MTK182,2,7 response)
+                 }*/
+                currentIndex += 2 * 16;  // Size of sep_record
+            }            
+            return currentIndex;
+        }
+        private static bool CheckEndOfChunk(string logstring, int currentIndex, int maxPacketSize, bool debug)
+        {
+            
+            BT747Device.WriteDebuglog("BT747,CheckEndOfChunk1 - maxPacketSize: " + maxPacketSize, debug);
+
+            if (maxPacketSize + currentIndex > logstring.Length)
+            {
+                BT747Device.WriteDebuglog("BT747,CheckEndOfChunk2 - currentIndex: " + currentIndex + ",length: " + logstring.Length, debug);
+                return true;
+            }
+            else if (logstring.Length > currentIndex + 8)
+            {
+                BT747Device.WriteDebuglog("BT747,CheckEndOfChunk3 - currentIndex: " + currentIndex + ",length: " + logstring.Length, debug);
+
+                if (logstring.Substring(currentIndex).StartsWith("FFFFFFFF"))
+                {
+                    BT747Device.WriteDebuglog("BT747,CheckEndOfChunk4 - currentIndex: " + currentIndex + ",length: " + logstring.Length, debug);
+                    return true;
+                }
+            }
+            BT747Device.WriteDebuglog("BT747,CheckEndOfChunk5 - currentIndex: " + currentIndex + ",length: " + logstring.Length, debug);
+            return false;
+        }
 
         public static byte SendPacketCommandId(byte[] packet)
         {
